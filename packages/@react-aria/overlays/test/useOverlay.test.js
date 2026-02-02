@@ -139,4 +139,172 @@ describe('useOverlay', function () {
       expect(isPrevented).toBeFalsy(); // meaning the event had preventDefault called
     });
   });
+
+  describe('CloseWatcher', () => {
+    let mockCloseWatchers = [];
+    let originalCloseWatcher;
+
+    class MockCloseWatcher {
+      constructor() {
+        this.listeners = {};
+        this.destroyed = false;
+        mockCloseWatchers.push(this);
+      }
+
+      addEventListener(event, callback) {
+        if (!this.listeners[event]) {
+          this.listeners[event] = [];
+        }
+        this.listeners[event].push(callback);
+      }
+
+      removeEventListener(event, callback) {
+        if (this.listeners[event]) {
+          this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+        }
+      }
+
+      destroy() {
+        this.destroyed = true;
+        this.listeners = {};
+      }
+
+      // Test helper to trigger close event
+      triggerClose() {
+        if (this.listeners.close) {
+          this.listeners.close.forEach(cb => cb());
+        }
+      }
+    }
+
+    beforeAll(() => {
+      originalCloseWatcher = window.CloseWatcher;
+      window.CloseWatcher = MockCloseWatcher;
+    });
+
+    afterAll(() => {
+      if (originalCloseWatcher) {
+        window.CloseWatcher = originalCloseWatcher;
+      } else {
+        delete window.CloseWatcher;
+      }
+    });
+
+    beforeEach(() => {
+      mockCloseWatchers = [];
+    });
+
+    afterEach(() => {
+      mockCloseWatchers.forEach(w => w.destroy());
+      mockCloseWatchers = [];
+    });
+
+    it('should use CloseWatcher when available', function () {
+      let onClose = jest.fn();
+      render(<Example isOpen onClose={onClose} />);
+
+      expect(mockCloseWatchers.length).toBe(1);
+      expect(mockCloseWatchers[0].destroyed).toBe(false);
+    });
+
+    it('should hide the overlay when CloseWatcher close event fires', function () {
+      let onClose = jest.fn();
+      render(<Example isOpen onClose={onClose} />);
+
+      expect(mockCloseWatchers.length).toBe(1);
+      mockCloseWatchers[0].triggerClose();
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create a new CloseWatcher after close event fires', function () {
+      let onClose = jest.fn();
+      render(<Example isOpen onClose={onClose} />);
+
+      expect(mockCloseWatchers.length).toBe(1);
+      let firstWatcher = mockCloseWatchers[0];
+
+      firstWatcher.triggerClose();
+
+      // A new watcher should be created
+      expect(mockCloseWatchers.length).toBe(2);
+      expect(mockCloseWatchers[1]).not.toBe(firstWatcher);
+    });
+
+    it('should destroy CloseWatcher when overlay unmounts', function () {
+      let onClose = jest.fn();
+      let {unmount} = render(<Example isOpen onClose={onClose} />);
+
+      expect(mockCloseWatchers.length).toBe(1);
+      let watcher = mockCloseWatchers[0];
+      expect(watcher.destroyed).toBe(false);
+
+      unmount();
+
+      expect(watcher.destroyed).toBe(true);
+    });
+
+    it('should not create CloseWatcher when isKeyboardDismissDisabled is true', function () {
+      let onClose = jest.fn();
+      render(<Example isOpen onClose={onClose} isKeyboardDismissDisabled />);
+
+      expect(mockCloseWatchers.length).toBe(0);
+    });
+
+    it('should only hide top-most overlay when CloseWatcher fires', function () {
+      let onCloseFirst = jest.fn();
+      let onCloseSecond = jest.fn();
+      render(<Example isOpen onClose={onCloseFirst} />);
+      let second = render(<Example isOpen onClose={onCloseSecond} />);
+
+      // Should have 2 watchers
+      expect(mockCloseWatchers.length).toBe(2);
+
+      // Trigger close on the second watcher (top-most overlay)
+      mockCloseWatchers[1].triggerClose();
+
+      expect(onCloseSecond).toHaveBeenCalledTimes(1);
+      expect(onCloseFirst).not.toHaveBeenCalled();
+
+      second.unmount();
+
+      // Trigger close on the first watcher (now top-most)
+      // Need to get the current active watcher for first overlay
+      let firstOverlayWatchers = mockCloseWatchers.filter(w => !w.destroyed);
+      firstOverlayWatchers[0].triggerClose();
+
+      expect(onCloseFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not use keyboard handler when CloseWatcher is available', function () {
+      let onClose = jest.fn();
+      let res = render(<Example isOpen onClose={onClose} />);
+      let el = res.getByTestId('test');
+
+      expect(mockCloseWatchers.length).toBe(1);
+
+      // Keyboard handler should be bypassed when CloseWatcher is available
+      fireEvent.keyDown(el, {key: 'Escape'});
+
+      // onClose should not be called from keyDown since CloseWatcher handles it
+      expect(onClose).toHaveBeenCalledTimes(0);
+
+      // But CloseWatcher close event should still work
+      mockCloseWatchers[0].triggerClose();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('should destroy CloseWatcher when overlay closes', function () {
+      let onClose = jest.fn();
+      let {rerender} = render(<Example isOpen onClose={onClose} />);
+
+      expect(mockCloseWatchers.length).toBe(1);
+      let watcher = mockCloseWatchers[0];
+      expect(watcher.destroyed).toBe(false);
+
+      rerender(<Example isOpen={false} onClose={onClose} />);
+
+      expect(watcher.destroyed).toBe(true);
+    });
+  });
 });

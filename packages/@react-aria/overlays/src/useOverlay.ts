@@ -13,6 +13,7 @@
 import {DOMAttributes, RefObject} from '@react-types/shared';
 import {isElementInChildOfActiveScope} from '@react-aria/focus';
 import {useEffect, useRef} from 'react';
+import {useEffectEvent} from '@react-aria/utils';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
 export interface AriaOverlayProps {
@@ -85,12 +86,51 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     }
   }, [isOpen, ref]);
 
-  // Only hide the overlay when it is the topmost visible overlay in the stack
+  // Only hide the overlay when it is the topmost visible overlay in the stack.
   let onHide = () => {
     if (visibleOverlays[visibleOverlays.length - 1] === ref && onClose) {
       onClose();
     }
   };
+
+  // Use CloseWatcher API when available to handle close requests (Escape key, back button, etc.).
+  // CloseWatcher is automatically destroyed after firing, so we need to create a new one.
+  // This replaces the onKeyDown Escape handler when supported.
+  let closeWatcherRef = useRef<any>(null);
+  let supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
+
+  // Wrap onHide in useEffectEvent to avoid stale closure in CloseWatcher handler
+  let onHideEvent = useEffectEvent(onHide);
+
+  useEffect(() => {
+    if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher) {
+      return;
+    }
+
+    let isMounted = true;
+
+    let createCloseWatcher = () => {
+      // @ts-ignore - CloseWatcher is a newer API not yet in all TypeScript libs
+      let watcher = new window.CloseWatcher();
+      watcher.addEventListener('close', () => {
+        onHideEvent();
+        // CloseWatcher is automatically destroyed after firing.
+        // Create a new one if the effect is still active (overlay still open).
+        if (isMounted) {
+          closeWatcherRef.current = createCloseWatcher();
+        }
+      });
+      return watcher;
+    };
+
+    closeWatcherRef.current = createCloseWatcher();
+
+    return () => {
+      isMounted = false;
+      closeWatcherRef.current?.destroy();
+      closeWatcherRef.current = null;
+    };
+  }, [isOpen, isKeyboardDismissDisabled, supportsCloseWatcher]);
 
   let onInteractOutsideStart = (e: PointerEvent) => {
     const topMostOverlay = visibleOverlays[visibleOverlays.length - 1];
@@ -116,8 +156,11 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     lastVisibleOverlay.current = undefined;
   };
 
-  // Handle the escape key
+  // Handle the escape key (fallback when CloseWatcher is not supported)
   let onKeyDown = (e) => {
+    if (supportsCloseWatcher) {
+      return;
+    }
     if (e.key === 'Escape' && !isKeyboardDismissDisabled && !e.nativeEvent.isComposing) {
       e.stopPropagation();
       e.preventDefault();
