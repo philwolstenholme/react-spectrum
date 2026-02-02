@@ -144,7 +144,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     lastVisibleOverlay.current = undefined;
   };
 
-  // Handle the escape key (fallback when CloseWatcher is not supported)
+  // Handle the escape key
   let onKeyDown = (e) => {
     if (supportsCloseWatcher) {
       return;
