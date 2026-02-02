@@ -12,7 +12,7 @@
 
 import {DOMAttributes, RefObject} from '@react-types/shared';
 import {isElementInChildOfActiveScope} from '@react-aria/focus';
-import {useCallback, useEffect, useRef} from 'react';
+import {useEffect, useRef} from 'react';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
 // CloseWatcher is a newer browser API that handles close requests (Escape key, Android back button, etc.)
@@ -104,16 +104,18 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
   }, [isOpen, ref]);
 
   // Only hide the overlay when it is the topmost visible overlay in the stack.
-  // Wrapped in useCallback for stable reference in CloseWatcher effect.
-  let onHide = useCallback(() => {
+  // Used for keyboard fallback and interact outside handlers.
+  let onHide = () => {
     if (visibleOverlays[visibleOverlays.length - 1] === ref && onClose) {
       onClose();
     }
-  }, [ref, onClose]);
+  };
 
   // Use CloseWatcher API when supported for handling close requests (Escape key, Android back button, etc.).
   // CloseWatcher provides a unified way to handle close signals across different devices and input methods.
   // Falls back to keyboard event handling in browsers that don't support CloseWatcher.
+  // Note: CloseWatchers automatically stack - only the topmost watcher receives close signals,
+  // so we can call onClose directly without checking if we're the topmost overlay.
   useEffect(() => {
     if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher) {
       return;
@@ -121,7 +123,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
     closeWatcherRef.current = new ((window as any).CloseWatcher as CloseWatcherConstructor)();
     closeWatcherRef.current.onclose = () => {
-      onHide();
+      onClose?.();
     };
 
     return () => {
@@ -131,7 +133,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
       closeWatcherRef.current?.destroy();
       closeWatcherRef.current = null;
     };
-  }, [isOpen, isKeyboardDismissDisabled, onHide]);
+  }, [isOpen, isKeyboardDismissDisabled, onClose]);
 
   let onInteractOutsideStart = (e: PointerEvent) => {
     const topMostOverlay = visibleOverlays[visibleOverlays.length - 1];
