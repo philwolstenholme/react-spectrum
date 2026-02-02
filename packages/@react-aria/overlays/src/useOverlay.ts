@@ -93,16 +93,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     }
   };
 
-  // Use CloseWatcher API when available to handle close requests (Escape key, back button, etc.).
-  // CloseWatcher automatically stacks - only the topmost watcher fires, so we don't need
-  // to check if this overlay is topmost. We create one when the overlay opens and destroy
-  // it when it closes. This replaces the onKeyDown Escape handler when supported.
-  // Note: supportsCloseWatcher is a constant that never changes during the component's
-  // lifetime, so it's safe to exclude from the dependency array.
   let supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
-
-  // Wrap onClose in useEffectEvent to avoid stale closure in CloseWatcher handler.
-  // This must be called unconditionally (Rules of Hooks) even when CloseWatcher isn't supported.
   let onCloseEvent = useEffectEvent(() => onClose?.());
 
   useEffect(() => {
