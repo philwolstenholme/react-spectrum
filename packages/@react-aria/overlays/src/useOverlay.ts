@@ -15,18 +15,6 @@ import {isElementInChildOfActiveScope} from '@react-aria/focus';
 import {useEffect, useRef} from 'react';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
-interface CloseWatcherInstance extends EventTarget {
-  close(): void,
-  destroy(): void,
-  oncancel: ((this: CloseWatcherInstance, ev: Event) => any) | null,
-  onclose: ((this: CloseWatcherInstance, ev: Event) => any) | null
-}
-
-interface CloseWatcherConstructor {
-  prototype: CloseWatcherInstance,
-  new(options?: {signal?: AbortSignal}): CloseWatcherInstance
-}
-
 const supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
 
 export interface AriaOverlayProps {
@@ -85,7 +73,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
   } = props;
 
   let lastVisibleOverlay = useRef<RefObject<Element | null>>(undefined);
-  let closeWatcherRef = useRef<CloseWatcherInstance | null>(null);
+  let closeWatcherRef = useRef<any>(null);
 
   // Add the overlay ref to the stack of visible overlays on mount, and remove on unmount.
   useEffect(() => {
@@ -114,7 +102,8 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
       return;
     }
 
-    closeWatcherRef.current = new ((window as any).CloseWatcher as CloseWatcherConstructor)();
+    // @ts-ignore - CloseWatcher is not yet in the DOM types
+    closeWatcherRef.current = new CloseWatcher();
     closeWatcherRef.current.onclose = () => onClose?.();
 
     return () => {
