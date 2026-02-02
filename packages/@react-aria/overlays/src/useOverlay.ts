@@ -13,6 +13,7 @@
 import {DOMAttributes, RefObject} from '@react-types/shared';
 import {isElementInChildOfActiveScope} from '@react-aria/focus';
 import {useEffect, useRef} from 'react';
+import {useEffectEvent} from '@react-aria/utils';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
 export interface AriaOverlayProps {
@@ -92,6 +93,24 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     }
   };
 
+  let supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
+  let onCloseEvent = useEffectEvent(() => onClose?.());
+
+  useEffect(() => {
+    if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher) {
+      return;
+    }
+
+    // @ts-ignore - CloseWatcher is a newer API not yet in all TypeScript libs
+    let watcher = new window.CloseWatcher();
+    watcher.addEventListener('close', onCloseEvent);
+
+    return () => {
+      watcher.destroy();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isKeyboardDismissDisabled]);
+
   let onInteractOutsideStart = (e: PointerEvent) => {
     const topMostOverlay = visibleOverlays[visibleOverlays.length - 1];
     lastVisibleOverlay.current = topMostOverlay;
@@ -118,6 +137,9 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
   // Handle the escape key
   let onKeyDown = (e) => {
+    if (supportsCloseWatcher) {
+      return;
+    }
     if (e.key === 'Escape' && !isKeyboardDismissDisabled && !e.nativeEvent.isComposing) {
       e.stopPropagation();
       e.preventDefault();
