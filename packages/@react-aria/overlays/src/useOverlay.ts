@@ -130,7 +130,8 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
       closeWatcherRef.current?.destroy();
       closeWatcherRef.current = null;
     };
-  }, [isOpen, isKeyboardDismissDisabled, supportsCloseWatcher]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isKeyboardDismissDisabled]);
 
   let onInteractOutsideStart = (e: PointerEvent) => {
     const topMostOverlay = visibleOverlays[visibleOverlays.length - 1];

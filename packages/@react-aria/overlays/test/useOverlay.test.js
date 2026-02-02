@@ -191,6 +191,7 @@ describe('useOverlay', function () {
     });
 
     beforeEach(() => {
+      mockCloseWatchers.forEach(w => w.destroy());
       mockCloseWatchers = [];
     });
 
