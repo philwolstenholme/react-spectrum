@@ -73,7 +73,6 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
   } = props;
 
   let lastVisibleOverlay = useRef<RefObject<Element | null>>(undefined);
-  let closeWatcherRef = useRef<any>(null);
 
   // Add the overlay ref to the stack of visible overlays on mount, and remove on unmount.
   useEffect(() => {
@@ -103,13 +102,10 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
     }
 
     // @ts-ignore - CloseWatcher is not yet in the DOM types
-    closeWatcherRef.current = new CloseWatcher();
-    closeWatcherRef.current.onclose = () => onClose?.();
+    let closeWatcher = new CloseWatcher();
+    closeWatcher.onclose = () => onClose?.();
 
-    return () => {
-      closeWatcherRef.current?.destroy();
-      closeWatcherRef.current = null;
-    };
+    return () => closeWatcher.destroy();
   }, [isOpen, isKeyboardDismissDisabled, onClose]);
 
   let onInteractOutsideStart = (e: PointerEvent) => {
@@ -138,10 +134,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
   // Handle the escape key
   let onKeyDown = (e) => {
-    if (e.key === 'Escape' && !isKeyboardDismissDisabled && !e.nativeEvent.isComposing) {
-      if (closeWatcherRef.current) {
-        return;
-      }
+    if (e.key === 'Escape' && !isKeyboardDismissDisabled && !supportsCloseWatcher && !e.nativeEvent.isComposing) {
       e.stopPropagation();
       e.preventDefault();
       onHide();
