@@ -218,20 +218,6 @@ describe('useOverlay', function () {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should create a new CloseWatcher after close event fires', function () {
-      let onClose = jest.fn();
-      render(<Example isOpen onClose={onClose} />);
-
-      expect(mockCloseWatchers.length).toBe(1);
-      let firstWatcher = mockCloseWatchers[0];
-
-      firstWatcher.triggerClose();
-
-      // A new watcher should be created
-      expect(mockCloseWatchers.length).toBe(2);
-      expect(mockCloseWatchers[1]).not.toBe(firstWatcher);
-    });
-
     it('should destroy CloseWatcher when overlay unmounts', function () {
       let onClose = jest.fn();
       let {unmount} = render(<Example isOpen onClose={onClose} />);
@@ -252,28 +238,31 @@ describe('useOverlay', function () {
       expect(mockCloseWatchers.length).toBe(0);
     });
 
-    it('should only hide top-most overlay when CloseWatcher fires', function () {
+    it('should create one CloseWatcher per overlay (stacking is handled by browser)', function () {
       let onCloseFirst = jest.fn();
       let onCloseSecond = jest.fn();
       render(<Example isOpen onClose={onCloseFirst} />);
       let second = render(<Example isOpen onClose={onCloseSecond} />);
 
-      // Should have 2 watchers
+      // Each overlay creates its own CloseWatcher
+      // Browser handles stacking - only topmost watcher fires
       expect(mockCloseWatchers.length).toBe(2);
+      expect(mockCloseWatchers[0].destroyed).toBe(false);
+      expect(mockCloseWatchers[1].destroyed).toBe(false);
 
-      // Trigger close on the second watcher (top-most overlay)
+      // Simulate browser behavior: only topmost watcher fires
       mockCloseWatchers[1].triggerClose();
-
       expect(onCloseSecond).toHaveBeenCalledTimes(1);
       expect(onCloseFirst).not.toHaveBeenCalled();
 
       second.unmount();
 
-      // Trigger close on the first watcher (now top-most)
-      // Need to get the current active watcher for first overlay
-      let firstOverlayWatchers = mockCloseWatchers.filter(w => !w.destroyed);
-      firstOverlayWatchers[0].triggerClose();
+      // Second watcher should be destroyed
+      expect(mockCloseWatchers[1].destroyed).toBe(true);
+      expect(mockCloseWatchers[0].destroyed).toBe(false);
 
+      // First watcher is now topmost, can fire
+      mockCloseWatchers[0].triggerClose();
       expect(onCloseFirst).toHaveBeenCalledTimes(1);
     });
 

@@ -94,41 +94,28 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
   };
 
   // Use CloseWatcher API when available to handle close requests (Escape key, back button, etc.).
-  // CloseWatcher is automatically destroyed after firing, so we need to create a new one.
-  // This replaces the onKeyDown Escape handler when supported.
-  let closeWatcherRef = useRef<any>(null);
+  // CloseWatcher automatically stacks - only the topmost watcher fires, so we don't need
+  // to check if this overlay is topmost. We create one when the overlay opens and destroy
+  // it when it closes. This replaces the onKeyDown Escape handler when supported.
+  // Note: supportsCloseWatcher is a constant that never changes during the component's
+  // lifetime, so it's safe to exclude from the dependency array.
   let supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
 
-  // Wrap onHide in useEffectEvent to avoid stale closure in CloseWatcher handler
-  let onHideEvent = useEffectEvent(onHide);
+  // Wrap onClose in useEffectEvent to avoid stale closure in CloseWatcher handler.
+  // This must be called unconditionally (Rules of Hooks) even when CloseWatcher isn't supported.
+  let onCloseEvent = useEffectEvent(() => onClose?.());
 
   useEffect(() => {
     if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher) {
       return;
     }
 
-    let isMounted = true;
-
-    let createCloseWatcher = () => {
-      // @ts-ignore - CloseWatcher is a newer API not yet in all TypeScript libs
-      let watcher = new window.CloseWatcher();
-      watcher.addEventListener('close', () => {
-        onHideEvent();
-        // CloseWatcher is automatically destroyed after firing.
-        // Create a new one if the effect is still active (overlay still open).
-        if (isMounted) {
-          closeWatcherRef.current = createCloseWatcher();
-        }
-      });
-      return watcher;
-    };
-
-    closeWatcherRef.current = createCloseWatcher();
+    // @ts-ignore - CloseWatcher is a newer API not yet in all TypeScript libs
+    let watcher = new window.CloseWatcher();
+    watcher.addEventListener('close', onCloseEvent);
 
     return () => {
-      isMounted = false;
-      closeWatcherRef.current?.destroy();
-      closeWatcherRef.current = null;
+      watcher.destroy();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isKeyboardDismissDisabled]);
