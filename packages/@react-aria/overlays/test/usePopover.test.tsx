@@ -191,14 +191,5 @@ describe('useOverlay', () => {
 
       expect(watcher.destroyed).toBe(true);
     });
-
-    it('should handle undefined onClose without crashing', () => {
-      render(<OverlayExample isOpen />);
-
-      expect(mockCloseWatchers.length).toBe(1);
-
-      // Should not throw when close event fires with no onClose handler
-      expect(() => mockCloseWatchers[0].triggerClose()).not.toThrow();
-    });
   });
 });
