@@ -15,7 +15,7 @@ import {isElementInChildOfActiveScope} from '@react-aria/focus';
 import {useEffect, useRef} from 'react';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
-const supportsCloseWatcher = typeof window !== 'undefined' && 'CloseWatcher' in window;
+const supportsCloseWatcher = () => typeof window !== 'undefined' && 'CloseWatcher' in window;
 
 export interface AriaOverlayProps {
   /** Whether the overlay is currently open. */
@@ -97,7 +97,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
   // Use CloseWatcher for close signals (Escape, Android back) when supported.
   // CloseWatchers stack, so only the topmost receives close signals.
   useEffect(() => {
-    if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher) {
+    if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher()) {
       return;
     }
 
@@ -134,7 +134,7 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
   // Handle the escape key
   let onKeyDown = (e) => {
-    if (e.key === 'Escape' && !isKeyboardDismissDisabled && !supportsCloseWatcher && !e.nativeEvent.isComposing) {
+    if (e.key === 'Escape' && !isKeyboardDismissDisabled && !supportsCloseWatcher() && !e.nativeEvent.isComposing) {
       e.stopPropagation();
       e.preventDefault();
       onHide();
