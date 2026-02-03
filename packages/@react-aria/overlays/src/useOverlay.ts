@@ -13,6 +13,7 @@
 import {DOMAttributes, RefObject} from '@react-types/shared';
 import {isElementInChildOfActiveScope} from '@react-aria/focus';
 import {useEffect, useRef} from 'react';
+import {useEffectEvent} from '@react-aria/utils';
 import {useFocusWithin, useInteractOutside} from '@react-aria/interactions';
 
 const supportsCloseWatcher = () => typeof window !== 'undefined' && 'CloseWatcher' in window;
@@ -96,6 +97,10 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
   // Use CloseWatcher for close signals (Escape, Android back) when supported.
   // CloseWatchers stack, so only the topmost receives close signals.
+  let onCloseEvent = useEffectEvent(() => {
+    onClose?.();
+  });
+
   useEffect(() => {
     if (!isOpen || isKeyboardDismissDisabled || !supportsCloseWatcher()) {
       return;
@@ -103,10 +108,10 @@ export function useOverlay(props: AriaOverlayProps, ref: RefObject<Element | nul
 
     // @ts-ignore - CloseWatcher is not yet in the DOM types
     let closeWatcher = new CloseWatcher();
-    closeWatcher.onclose = () => onClose?.();
+    closeWatcher.onclose = onCloseEvent;
 
     return () => closeWatcher.destroy();
-  }, [isOpen, isKeyboardDismissDisabled, onClose]);
+  }, [isOpen, isKeyboardDismissDisabled, onCloseEvent]);
 
   let onInteractOutsideStart = (e: PointerEvent) => {
     const topMostOverlay = visibleOverlays[visibleOverlays.length - 1];
